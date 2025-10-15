@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const userStatusEl = document.getElementById('user-status');
     const manageKeysBtn = document.getElementById('manage-keys-btn');
     const mainContentEl = document.getElementById('main-content');
-    const navLinks = document.querySelectorAll('.nav-link');
     const userProfileEl = document.getElementById('user-profile');
     const userDropdownEl = document.getElementById('user-dropdown');
     let currentUser = null;
@@ -14,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/user/me');
             if (!response.ok) {
                 window.location.href = '/index.html';
-                return;
+                return null;
             }
             const user = await response.json();
             currentUser = user;
@@ -25,25 +24,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             userStatusEl.textContent = user.isPerm ? '(Perm)' : '(Free)';
 
-            if (user.isAdmin) {
+            if (user.isAdmin && !document.querySelector('a[href="#managekeys"]')) {
                 manageKeysBtn.style.display = 'block';
-                // Ajoute le lien de navigation pour l'admin
                 const adminNavLink = document.createElement('a');
                 adminNavLink.href = '#managekeys';
                 adminNavLink.className = 'nav-link';
                 adminNavLink.textContent = 'Manage Keys';
                 document.querySelector('nav').appendChild(adminNavLink);
-                // Mettre à jour la liste des liens de navigation
-                document.querySelectorAll('.nav-link').forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        window.location.hash = link.hash;
-                    });
-                });
             }
+            return user;
         } catch (error) {
             console.error('Error fetching user:', error);
             window.location.href = '/index.html';
+            return null;
         }
     }
     
@@ -69,21 +62,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 else mainContentEl.innerHTML = '<h1>Access Denied</h1>';
                 break;
             default:
-                mainContentEl.innerHTML = '<h1>Page Not Found</h1>';
+                mainContentEl.innerHTML = `<h1>Welcome, ${currentUser.username}!</h1><p>This is the main page of your key system. Select an option from the navigation bar to begin.</p>`;
         }
     }
     
     async function renderGetKeyPage() {
-        let keyInfoHtml = currentUser.isPerm ? 
-            `<p>As a permanent user, you have one key linked to your account for life.</p>
-             <button id="reset-key-btn" class="btn btn-primary">Reset Roblox User ID (1 week cooldown)</button>` :
-            `<p>As a free user, you can get a key that lasts for 24 hours.</p>
-             <p><em>(In a real scenario, you would complete a Linkvertise here.)</em></p>`;
+        let keyInfoHtml, buttonText;
+        if (currentUser.isPerm) {
+            keyInfoHtml = `<p>As a permanent user, you have one key linked to your account for life.</p>
+             <button id="reset-key-btn" class="btn btn-primary">Reset Roblox User ID (1 week cooldown)</button>`;
+            buttonText = "Get/View My Key";
+        } else {
+            keyInfoHtml = `<p>As a free user, you need to complete a task to get a key that lasts for 24 hours.</p>`;
+            buttonText = "Start Task to Get Key";
+        }
 
         mainContentEl.innerHTML = `
             <h1>Get Your Key</h1>
             ${keyInfoHtml}
-            <button id="get-key-btn" class="btn btn-primary" style="margin-top: 10px;">Get/View My Key</button>
+            <button id="get-key-btn" class="btn btn-primary" style="margin-top: 10px;">${buttonText}</button>
             <div id="key-display-box" style="display:none; margin-top: 20px; background-color: var(--background-tertiary); padding: 15px; border-radius: var(--border-radius);">
                 <p>Your Key:</p>
                 <input type="text" id="key-output" readonly style="width: 100%; background-color: var(--background-primary); border: none; color: white; padding: 10px; border-radius: 5px; text-align: center; font-size: 1.1em;">
@@ -93,29 +90,62 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         
         document.getElementById('get-key-btn').addEventListener('click', async () => {
-            const response = await fetch('/api/key/generate', { method: 'POST' });
+            const messageEl = document.getElementById('key-message');
+            messageEl.textContent = 'Processing...';
+            const response = await fetch('/api/key/get', { method: 'POST' });
             const data = await response.json();
-            document.getElementById('key-display-box').style.display = 'block';
-            document.getElementById('key-output').value = data.key;
-            document.getElementById('key-message').textContent = 'Key retrieved successfully!';
+
+            if (data.key) {
+                document.getElementById('key-display-box').style.display = 'block';
+                document.getElementById('key-output').value = data.key;
+                messageEl.textContent = 'Key retrieved successfully!';
+            } else if (data.linkvertiseUrl) {
+                messageEl.textContent = 'Redirecting to task...';
+                window.location.href = data.linkvertiseUrl;
+            } else {
+                messageEl.textContent = data.error || 'An unknown error occurred.';
+            }
         });
 
-        document.getElementById('copy-key-btn').addEventListener('click', () => {
+        document.getElementById('copy-key-btn')?.addEventListener('click', () => {
             const keyOutput = document.getElementById('key-output');
             keyOutput.select();
             document.execCommand('copy');
             document.getElementById('key-message').textContent = 'Key copied to clipboard!';
         });
 
-        if (currentUser.isPerm) {
-            document.getElementById('reset-key-btn').addEventListener('click', async () => {
-                const messageEl = document.getElementById('key-message');
+        document.getElementById('reset-key-btn')?.addEventListener('click', async () => {
+             const messageEl = document.getElementById('key-message');
                 messageEl.textContent = 'Resetting...';
                 const response = await fetch('/api/key/reset', { method: 'POST' });
                 const data = await response.json();
                 messageEl.textContent = data.error || data.message;
-            });
+        });
+        
+        // Vérifier si l'utilisateur revient de Linkvertise
+        const currentUrl = new URL(window.location.href);
+        const hash = currentUrl.hash;
+        if (hash.startsWith('#getkey?from=linkvertise')) {
+            claimFreeKey();
         }
+    }
+
+    async function claimFreeKey() {
+        const messageEl = document.getElementById('key-message');
+        if (!messageEl) return;
+
+        messageEl.textContent = 'Verifying task completion, please wait...';
+        const response = await fetch('/api/key/claim-free-key', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.key) {
+            document.getElementById('key-display-box').style.display = 'block';
+            document.getElementById('key-output').value = data.key;
+            messageEl.textContent = data.message || 'Key claimed successfully!';
+        } else {
+            messageEl.textContent = `Error: ${data.error}`;
+        }
+        history.pushState(null, '', window.location.pathname + '#getkey');
     }
 
     function renderSuggestionPage() {
@@ -145,19 +175,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     async function renderManageKeysPage() {
-        // Code pour la page de gestion des clés (non implémenté pour garder la réponse concise)
-        mainContentEl.innerHTML = `<h1>Key Management</h1><p>The key management interface is not yet implemented in this tutorial part.</p>`;
+        mainContentEl.innerHTML = `<h1>Key Management</h1><p>This feature is not yet fully implemented in the frontend.</p>`;
     }
-
 
     userProfileEl.addEventListener('click', () => {
         userDropdownEl.style.display = userDropdownEl.style.display === 'flex' ? 'none' : 'flex';
     });
 
-    window.addEventListener('hashchange', () => navigate(window.location.hash || '#home'));
+    window.addEventListener('hashchange', () => {
+        const hash = window.location.hash.split('?')[0];
+        navigate(hash || '#home');
+    });
 
     (async () => {
-        await fetchUser();
-        navigate(window.location.hash || '#home');
+        if (await fetchUser()) {
+            const hash = window.location.hash.split('?')[0];
+            navigate(hash || '#home');
+        }
     })();
 });
