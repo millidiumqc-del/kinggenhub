@@ -1,5 +1,5 @@
 {
-  "name": "mon-keyhub",
+  "name": "kingenhub-web",
   "version": "1.0.0",
   "description": "Key system with Discord auth",
   "main": "index.js",
