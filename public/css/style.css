@@ -23,7 +23,7 @@ body {
 
 .container {
     padding: 20px;
-    margin-top: 60px; /* Hauteur de la topbar */
+    margin-top: 60px;
 }
 
 .centered {
@@ -55,6 +55,9 @@ body {
     text-decoration: none;
     font-weight: 500;
     transition: background-color 0.2s;
+    cursor: pointer;
+    border: none;
+    font-family: 'Poppins', sans-serif;
 }
 
 .btn-primary {
@@ -66,7 +69,6 @@ body {
     background-color: #677bc4;
 }
 
-/* Topbar */
 .topbar {
     position: fixed;
     top: 0;
@@ -112,7 +114,6 @@ body {
     border-bottom-color: var(--brand-color);
 }
 
-/* User Profile */
 .user-profile {
     cursor: pointer;
     padding: 8px;
@@ -136,7 +137,6 @@ body {
     margin-left: 5px;
 }
 
-/* User Dropdown */
 .user-dropdown {
     display: none;
     position: absolute;
