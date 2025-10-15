@@ -55,10 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 await renderGetKeyPage();
                 break;
             case '#suggestion':
-                renderSuggestionPage();
+                // Implémentation future si besoin
+                mainContentEl.innerHTML = `<h1>Suggestion</h1><p>This feature will be available soon.</p>`;
                 break;
             case '#managekeys':
-                if(currentUser && currentUser.isAdmin) await renderManageKeysPage();
+                if(currentUser && currentUser.isAdmin) mainContentEl.innerHTML = `<h1>Key Management</h1><p>This feature will be available soon.</p>`;
                 else mainContentEl.innerHTML = '<h1>Access Denied</h1>';
                 break;
             default:
@@ -69,8 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renderGetKeyPage() {
         let keyInfoHtml, buttonText;
         if (currentUser.isPerm) {
-            keyInfoHtml = `<p>As a permanent user, you have one key linked to your account for life.</p>
-             <button id="reset-key-btn" class="btn btn-primary">Reset Roblox User ID (1 week cooldown)</button>`;
+            keyInfoHtml = `<p>As a permanent user, you have one key linked to your account for life.</p>`;
             buttonText = "Get/View My Key";
         } else {
             keyInfoHtml = `<p>As a free user, you need to complete a task to get a key that lasts for 24 hours.</p>`;
@@ -113,19 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.execCommand('copy');
             document.getElementById('key-message').textContent = 'Key copied to clipboard!';
         });
-
-        document.getElementById('reset-key-btn')?.addEventListener('click', async () => {
-             const messageEl = document.getElementById('key-message');
-                messageEl.textContent = 'Resetting...';
-                const response = await fetch('/api/key/reset', { method: 'POST' });
-                const data = await response.json();
-                messageEl.textContent = data.error || data.message;
-        });
         
-        // Vérifier si l'utilisateur revient de Linkvertise
-        const currentUrl = new URL(window.location.href);
-        const hash = currentUrl.hash;
-        if (hash.startsWith('#getkey?from=linkvertise')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('from') && urlParams.get('from') === 'linkvertise') {
             claimFreeKey();
         }
     }
@@ -148,36 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
         history.pushState(null, '', window.location.pathname + '#getkey');
     }
 
-    function renderSuggestionPage() {
-        mainContentEl.innerHTML = `
-            <h1>Submit a Suggestion</h1>
-            <textarea id="suggestion-text" placeholder="Type your suggestion here (min 10 characters)..." style="width: 100%; height: 150px; background-color: var(--background-secondary); border: 1px solid var(--background-tertiary); color: white; padding: 10px; border-radius: 5px;"></textarea>
-            <button id="submit-suggestion-btn" class="btn btn-primary" style="margin-top: 10px;">Submit</button>
-            <p id="suggestion-message" style="margin-top: 10px;"></p>
-        `;
-        document.getElementById('submit-suggestion-btn').addEventListener('click', async () => {
-            const text = document.getElementById('suggestion-text').value;
-            const messageEl = document.getElementById('suggestion-message');
-            messageEl.textContent = 'Submitting...';
-            const response = await fetch('/api/suggestion', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ suggestion: text })
-            });
-            const data = await response.json();
-            if (response.ok) {
-                messageEl.textContent = 'Suggestion submitted successfully!';
-                document.getElementById('suggestion-text').value = '';
-            } else {
-                messageEl.textContent = `Error: ${data.error}`;
-            }
-        });
-    }
-    
-    async function renderManageKeysPage() {
-        mainContentEl.innerHTML = `<h1>Key Management</h1><p>This feature is not yet fully implemented in the frontend.</p>`;
-    }
-
     userProfileEl.addEventListener('click', () => {
         userDropdownEl.style.display = userDropdownEl.style.display === 'flex' ? 'none' : 'flex';
     });
@@ -185,6 +145,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('hashchange', () => {
         const hash = window.location.hash.split('?')[0];
         navigate(hash || '#home');
+    });
+
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.hash = link.hash;
+        });
     });
 
     (async () => {
